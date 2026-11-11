@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Montador e Numerador de Pasta de Condomínio | PDF</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonte Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- pdf-lib e PDF.js via jsDelivr com fallback para cdnjs -->
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'"></script>
+
+    <script>
+        if (window.tailwind) {
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        fontFamily: { sans: ['Inter', 'sans-serif'] },
+                        colors: {
+                            brand: {
+                                50: '#eff6ff',
+                                100: '#dbeafe',
+                                200: '#bfdbfe',
+                                500: '#3b82f6',
+                                600: '#2563eb',
+                                700: '#1d4ed8',
+                                800: '#1e40af',
+                            }
+                        }
+                    }
+                }
+            };
+        }
+    </script>
+
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        ::-webkit-scrollbar { width: 7px; height: 7px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .preview-grid-bg {
+            background-color: #e2e8f0;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            padding: 0;
+            background: transparent;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen bg-slate-100 text-slate-800 antialiased">
+
+    <!-- Input oculto do PDF principal -->
+    <input type="file" id="pdf-file-input" accept="application/pdf,.pdf" class="hidden">
+
+    <!-- Cabeçalho Superior -->
+    <header class="bg-white border-b border-slate-200 px-4 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30 shadow-xs">
+        <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-sm sm:text-base font-bold text-slate-900 leading-tight">Montador & Numerador de Pasta PDF</h1>
+                <p class="text-[11px] text-slate-500">Capa (Pág. 1), Alertas opcionais e numeração precisa 100% no navegador</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span id="lib-status-badge" class="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Processamento Local Seguro
+            </span>
+        </div>
+    </header>
+
+    <!-- Toast de Notificações -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Layout Principal: Barra Lateral Esquerda + Área de Pré-visualização Direita -->
+    <main class="flex-1 flex flex-col lg:flex-row">
+        
+        <!-- =========================================================
+             BARRA LATERAL ESQUERDA (~390px)
+             ========================================================= -->
+        <aside class="w-full lg:w-[395px] bg-white border-b lg:border-b-0 lg:border-r border-slate-200 flex flex-col lg:h-[calc(100vh-61px)] lg:sticky lg:top-[61px] shrink-0">
+            
+            <!-- 1. TOPO FIXO: UPLOAD DO PDF PRINCIPAL -->
+            <div class="p-3.5 bg-gradient-to-b from-brand-50/80 to-white border-b border-slate-200 shrink-0">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-brand-800 flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-brand-600" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        Arquivo PDF Principal
+                    </span>
+                    <span id="pdf-status-pill" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                        Nenhum PDF anexado
+                    </span>
+                </div>
+
+                <!-- Dropzone quando vazio -->
+                <div id="pdf-dropzone" class="border-2 border-dashed border-brand-300 hover:border-brand-600 bg-white hover:bg-brand-50/40 rounded-xl p-3 transition-all cursor-pointer flex items-center justify-between gap-2.5">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-9 h-9 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-slate-800 truncate">Arraste o PDF ou clique aqui</p>
+                            <p class="text-[11px] text-slate-500 truncate">Anexe o arquivo para numerar</p>
+                        </div>
+                    </div>
+                    <button type="button" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-lg shrink-0 pointer-events-none">
+                        Escolher PDF
+                    </button>
+                </div>
+
+                <!-- Card quando PDF carregado -->
+                <div id="pdf-loaded-box" class="hidden bg-white border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-2xs">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <p id="pdf-filename-text" class="text-xs font-bold text-slate-800 truncate">documento.pdf</p>
+                            <p id="pdf-pagecount-text" class="text-[11px] font-medium text-emerald-700">0 páginas anexadas</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" id="btn-change-pdf" class="px-2.5 py-1.5 text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 border border-brand-200 rounded-lg cursor-pointer">
+                            Trocar
+                        </button>
+                        <button type="button" id="btn-remove-pdf" class="p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg cursor-pointer" title="Remover PDF">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. NAVEGAÇÃO POR ABAS -->
+            <div class="grid grid-cols-3 border-b border-slate-200 bg-slate-50 text-xs font-semibold shrink-0">
+                <button type="button" data-tab="capa" class="tab-btn py-2.5 px-2 border-b-2 border-brand-600 text-brand-700 bg-white flex items-center justify-center gap-1.5 cursor-pointer">
+                    <span>1. Capa</span>
+                </button>
+                <button type="button" data-tab="alertas" class="tab-btn py-2.5 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 cursor-pointer">
+                    <span>2. Alertas</span>
+                </button>
+                <button type="button" data-tab="numeros" class="tab-btn py-2.5 px-2 border-b-2 border-transparent text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 cursor-pointer">
+                    <span>3. Números</span>
+                </button>
+            </div>
+
+            <!-- 3. CONTEÚDO ROLÁVEL DAS ABAS -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                
+                <!-- ABA 1: CAPA (PÁG. 1) -->
+                <div id="tab-capa" class="tab-panel space-y-4">
+                    <div class="bg-brand-50 border border-brand-100 rounded-xl px-3 py-2 text-[11px] font-medium text-brand-800 flex items-center justify-between">
+                        <span>A Capa inicia a numeração na <strong>Página 1</strong></span>
+                        <span class="px-1.5 py-0.5 rounded bg-brand-600 text-white font-bold">Pág. 1</span>
+                    </div>
+
+                    <!-- Uploads de Imagens -->
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <!-- Logo Administradora -->
+                        <div class="border border-slate-200 rounded-xl p-2.5 bg-slate-50/70 flex flex-col">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Logo Administradora</span>
+                            <input type="file" id="input-admin-logo" accept="image/*" class="hidden">
+                            
+                            <div id="admin-logo-empty" class="flex-1 min-h-[88px] border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-lg p-2 flex flex-col items-center justify-center text-center cursor-pointer bg-white">
+                                <svg class="w-5 h-5 text-slate-400 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                <span class="text-[11px] font-semibold text-slate-600">Enviar Logo</span>
+                                <span class="text-[9px] text-slate-400">PNG / JPG</span>
+                            </div>
+
+                            <div id="admin-logo-filled" class="hidden flex-1 min-h-[88px] flex flex-col justify-between gap-1.5">
+                                <div class="h-14 bg-white border border-slate-200 rounded-lg p-1 flex items-center justify-center overflow-hidden">
+                                    <img id="admin-logo-preview-img" src="" alt="Logo Administradora" class="max-h-full max-w-full object-contain">
+                                </div>
+                                <div class="flex gap-1">
+                                    <button type="button" id="btn-change-admin-logo" class="flex-1 py-1 text-[10px] font-semibold bg-white border border-slate-300 rounded hover:bg-slate-50 cursor-pointer">Trocar</button>
+                                    <button type="button" id="btn-remove-admin-logo" class="px-2 py-1 text-[10px] font-semibold text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 cursor-pointer">✕</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Foto / Logo Condomínio -->
+                        <div class="border border-slate-200 rounded-xl p-2.5 bg-slate-50/70 flex flex-col">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Foto / Logo Condomínio</span>
+                            <input type="file" id="input-condo-img" accept="image/*" class="hidden">
+                            
+                            <div id="condo-img-empty" class="flex-1 min-h-[88px] border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-lg p-2 flex flex-col items-center justify-center text-center cursor-pointer bg-white">
+                                <svg class="w-5 h-5 text-slate-400 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                <span class="text-[11px] font-semibold text-slate-600">Enviar Imagem</span>
+                                <span class="text-[9px] text-slate-400">Fachada ou Logo</span>
+                            </div>
+
+                            <div id="condo-img-filled" class="hidden flex-1 min-h-[88px] flex flex-col justify-between gap-1.5">
+                                <div class="h-14 bg-white border border-slate-200 rounded-lg p-1 flex items-center justify-center overflow-hidden">
+                                    <img id="condo-img-preview-img" src="" alt="Imagem Condomínio" class="max-h-full max-w-full object-contain">
+                                </div>
+                                <div class="flex gap-1">
+                                    <button type="button" id="btn-change-condo-img" class="flex-1 py-1 text-[10px] font-semibold bg-white border border-slate-300 rounded hover:bg-slate-50 cursor-pointer">Trocar</button>
+                                    <button type="button" id="btn-remove-condo-img" class="px-2 py-1 text-[10px] font-semibold text-red-600 bg-white border border-red-200 rounded hover:bg-red-50 cursor-pointer">✕</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campos de Texto da Capa -->
+                    <div class="space-y-3">
+                        <div>
+                            <label for="cover-title" class="block text-xs font-semibold text-slate-700 mb-1">Título Principal</label>
+                            <input type="text" id="cover-title" value="PRESTAÇÃO DE CONTAS" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:border-brand-500 focus:outline-none">
+                        </div>
+
+                        <div>
+                            <label for="cover-condo-name" class="block text-xs font-semibold text-slate-700 mb-1">Nome do Condomínio</label>
+                            <input type="text" id="cover-condo-name" value="Condomínio Residencial Jardins" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Mês / Ano de Referência</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <select id="cover-month-select" class="rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 focus:border-brand-500 focus:outline-none">
+                                    <option value="">Personalizado...</option>
+                                    <option value="Janeiro">Janeiro</option>
+                                    <option value="Fevereiro">Fevereiro</option>
+                                    <option value="Março">Março</option>
+                                    <option value="Abril">Abril</option>
+                                    <option value="Maio">Maio</option>
+                                    <option value="Junho">Junho</option>
+                                    <option value="Julho">Julho</option>
+                                    <option value="Agosto">Agosto</option>
+                                    <option value="Setembro">Setembro</option>
+                                    <option value="Outubro">Outubro</option>
+                                    <option value="Novembro" selected>Novembro</option>
+                                    <option value="Dezembro">Dezembro</option>
+                                </select>
+                                <input type="text" id="cover-ref-text" value="Novembro / 2026" class="rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:border-brand-500 focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estilo Visual da Capa -->
+                    <div class="pt-3 border-t border-slate-200 space-y-3">
+                        <span class="block text-[11px] font-bold uppercase tracking-wider text-slate-500">Formatação Visual</span>
+                        
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label for="cover-theme-color" class="block text-xs font-medium text-slate-700 mb-1">Cor Tema</label>
+                                <div class="flex items-center gap-2 border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
+                                    <input type="color" id="cover-theme-color" value="#1e3a8a" class="w-6 h-6 cursor-pointer">
+                                    <span id="cover-theme-hex" class="text-xs font-mono text-slate-600 uppercase">#1E3A8A</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="cover-title-size" class="block text-xs font-medium text-slate-700 mb-1">Tamanho Título (pt)</label>
+                                <input type="number" id="cover-title-size" value="24" min="14" max="42" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-700 mb-1">Alinhamento</label>
+                                <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                                    <button type="button" data-align="center" class="cover-align-btn py-1 text-xs font-semibold rounded-lg bg-white text-brand-700 shadow-2xs cursor-pointer">Centro</button>
+                                    <button type="button" data-align="left" class="cover-align-btn py-1 text-xs font-semibold rounded-lg text-slate-600 hover:text-slate-900 cursor-pointer">Esquerda</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="cover-style" class="block text-xs font-medium text-slate-700 mb-1">Estilo</label>
+                                <select id="cover-style" class="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium focus:border-brand-500 focus:outline-none">
+                                    <option value="modern">Moderno</option>
+                                    <option value="classic">Clássico Moldurado</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA 2: ALERTAS / OBSERVAÇÕES (PÁG. 2) -->
+                <div id="tab-alertas" class="tab-panel hidden space-y-4">
+                    <div class="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                        <div>
+                            <label for="alerts-enabled" class="text-xs font-bold text-slate-900 cursor-pointer block">Incluir Página de Alertas</label>
+                            <span class="text-[11px] text-slate-600">Inserida como <strong>Página 2</strong> após a Capa</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="alerts-enabled" checked class="sr-only peer">
+                            <div class="w-10 h-5 bg-slate-300 rounded-full peer peer-checked:bg-amber-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+                        </label>
+                    </div>
+
+                    <div id="alerts-form-group" class="space-y-3">
+                        <div>
+                            <label for="alerts-title" class="block text-xs font-semibold text-slate-700 mb-1">Título da Página</label>
+                            <input type="text" id="alerts-title" value="ALERTAS E OBSERVAÇÕES IMPORTANTES" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium focus:border-brand-500 focus:outline-none">
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label for="alerts-text" class="block text-xs font-semibold text-slate-700">Texto de Alertas / Observações</label>
+                                <button type="button" id="btn-add-bullet" class="text-[11px] font-semibold text-brand-600 hover:text-brand-800 bg-brand-50 px-2 py-0.5 rounded-md cursor-pointer">
+                                    + Tópico (•)
+                                </button>
+                            </div>
+                            <textarea id="alerts-text" rows="8" class="w-full rounded-xl border border-slate-300 p-3 text-sm leading-relaxed focus:border-brand-500 focus:outline-none">Prezados Condôminos,
+
+Apresentamos a pasta de prestação de contas referente ao período indicado na capa. Destacamos os seguintes pontos:
+
+• Todas as notas fiscais e comprovantes encontram-se digitalizados nas páginas seguintes.
+• O saldo do fundo de reserva permanece aplicado em conta exclusiva do condomínio.
+• Dúvidas podem ser encaminhadas à administradora ou ao conselho fiscal.</textarea>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label for="alerts-font-size" class="block text-xs font-medium text-slate-700 mb-1">Tamanho Fonte (pt)</label>
+                                <input type="number" id="alerts-font-size" value="12" min="9" max="20" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label for="alerts-accent-color" class="block text-xs font-medium text-slate-700 mb-1">Cor de Destaque</label>
+                                <div class="flex items-center gap-2 border border-slate-300 rounded-xl px-2.5 py-1.5 bg-white">
+                                    <input type="color" id="alerts-accent-color" value="#b45309" class="w-6 h-6 cursor-pointer">
+                                    <span id="alerts-accent-hex" class="text-xs font-mono text-slate-600 uppercase">#B45309</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ABA 3: NÚMEROS -->
+                <div id="tab-numeros" class="tab-panel hidden space-y-4">
+                    <!-- Interruptor Exibir Número 1 na Capa -->
+                    <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-800">Contagem precisa: Capa = 1</span>
+                            <span class="text-[11px] font-mono font-bold bg-brand-100 text-brand-800 px-2 py-0.5 rounded">1 até N</span>
+                        </div>
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+                            <label for="show-num-on-cover" class="text-xs text-slate-700 cursor-pointer">Exibir número 1 na Capa</label>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="show-num-on-cover" checked class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-brand-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Seletor Visual de 6 Posições -->
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Posição na Página</label>
+                        <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                            <button type="button" data-pos="top-left" class="pos-btn p-2 rounded-lg text-[11px] font-medium flex flex-col items-center gap-1 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer">
+                                <div class="w-6 h-4 border border-current rounded-2xs relative"><span class="w-1.5 h-1 bg-current absolute top-0.5 left-0.5"></span></div>
+                                Sup. Esq
+                            </button>
+                            <button type="button" data-pos="top-center" class="pos-btn p-2 rounded-lg text-[11px] font-medium flex flex-col items-center gap-1 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer">
+                                <div class="w-6 h-4 border border-current rounded-2xs relative"><span class="w-1.5 h-1 bg-current absolute top-0.5 left-1/2 -translate-x-1/2"></span></div>
+                                Sup. Centro
+                            </button>
+                            <button type="button" data-pos="top-right" class="pos-btn p-2 rounded-lg text-[11px] font-medium flex flex-col items-center gap-1 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer">
+                                <div class="w-6 h-4 border border-current rounded-2xs relative"><span class="w-1.5 h-1 bg-current absolute top-0.5 right-0.5"></span></div>
+                                Sup. Dir
+                            </button>
+                            <button type="button" data-pos="bottom-left" class="pos-btn p-2 rounded-lg text-[11px] font-medium flex flex-col items-center gap-1 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer">
+                                <div class="w-6 h-4 border border-current rounded-2xs relative"><span class="w-1.5 h-1 bg-current absolute bottom-0.5 left-0.5"></span></div>
+                                Inf. Esq
+                            </button>
+                            <button type="button" data-pos="bottom-center" class="pos-btn p-2 rounded-lg text-[11px] font-medium flex flex-col items-center gap-1 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer">
+                                <div class="w-6 h-4 border border-current rounded-2xs relative"><span class="w-1.5 h-1 bg-current absolute bottom-0.5 left-1/2 -translate-x-1/2"></span></div>
+                                Inf. Centro
+                            </button>
+                            <button type="button" data-pos="bottom-right" class="pos-btn p-2 rounded-lg text-[11px] font-semibold flex flex-col items-center gap-1 bg-brand-600 text-white shadow-2xs cursor-pointer">
+                                <div class="w-6 h-4 border border-current rounded-2xs relative"><span class="w-1.5 h-1 bg-current absolute bottom-0.5 right-0.5"></span></div>
+                                Inf. Dir
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Formatos -->
+                    <div>
+                        <label for="num-format-select" class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">Formato</label>
+                        <select id="num-format-select" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-brand-500 focus:outline-none">
+                            <option value="{n}">Apenas número (1, 2, 3...)</option>
+                            <option value="Pág. {n}">Pág. 1, Pág. 2...</option>
+                            <option value="{n} / {total}">1 / 10</option>
+                            <option value="Página {n} de {total}" selected>Página 1 de 10</option>
+                            <option value="custom">Personalizado...</option>
+                        </select>
+                        <div id="custom-format-box" class="hidden mt-2">
+                            <input type="text" id="num-custom-format" value="Fl. {n} de {total}" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs focus:border-brand-500 focus:outline-none">
+                            <p class="text-[10px] text-slate-500 mt-1">Variáveis: <strong>{n}</strong> (atual) e <strong>{total}</strong> (total).</p>
+                        </div>
+                    </div>
+
+                    <!-- Fonte, Tamanho e Cor -->
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <label for="num-font-family" class="block text-xs font-medium text-slate-700 mb-1">Fonte</label>
+                            <select id="num-font-family" class="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:border-brand-500 focus:outline-none">
+                                <option value="Helvetica">Helvetica (Sans)</option>
+                                <option value="TimesRoman">Times (Serif)</option>
+                                <option value="Courier">Courier (Mono)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="num-font-size" class="block text-xs font-medium text-slate-700 mb-1">Tamanho (pt)</label>
+                            <input type="number" id="num-font-size" value="11" min="6" max="36" class="w-full rounded-xl border border-slate-300 px-3 py-1.5 text-xs focus:border-brand-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label for="num-text-color" class="block text-xs font-medium text-slate-700 mb-1">Cor Texto</label>
+                            <div class="flex items-center gap-1.5 border border-slate-300 rounded-xl px-2 py-1 bg-white">
+                                <input type="color" id="num-text-color" value="#1e293b" class="w-5 h-5 cursor-pointer">
+                                <span id="num-text-hex" class="text-[10px] font-mono text-slate-600">#1E293B</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="num-margin-x" class="block text-xs font-medium text-slate-700 mb-1">Margem X</label>
+                            <input type="number" id="num-margin-x" value="36" min="5" max="180" class="w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs focus:border-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label for="num-margin-y" class="block text-xs font-medium text-slate-700 mb-1">Margem Y</label>
+                            <input type="number" id="num-margin-y" value="24" min="5" max="180" class="w-full rounded-xl border border-slate-300 px-2.5 py-1.5 text-xs focus:border-brand-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Caixa de Fundo -->
+                    <div class="pt-2 border-t border-slate-200 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label for="num-bg-enabled" class="text-xs font-semibold text-slate-700 cursor-pointer">Fundo atrás do número</label>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="num-bg-enabled" checked class="sr-only peer">
+                                <div class="w-9 h-5 bg-slate-300 rounded-full peer peer-checked:bg-brand-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+                            </label>
+                        </div>
+
+                        <div id="num-bg-controls" class="grid grid-cols-2 gap-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                            <div>
+                                <label for="num-bg-color" class="block text-[11px] font-medium text-slate-700 mb-1">Cor do Fundo</label>
+                                <div class="flex items-center gap-1.5 border border-slate-300 rounded-lg px-2 py-1 bg-white">
+                                    <input type="color" id="num-bg-color" value="#ffffff" class="w-5 h-5 cursor-pointer">
+                                    <span id="num-bg-hex" class="text-[10px] font-mono text-slate-600">#FFFFFF</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="num-bg-opacity" class="block text-[11px] font-medium text-slate-700 mb-1">Opacidade (<span id="num-bg-opacity-label">90</span>%)</label>
+                                <input type="range" id="num-bg-opacity" min="10" max="100" value="90" class="w-full accent-brand-600 mt-1.5">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. RODAPÉ FIXO DA BARRA LATERAL -->
+            <div class="p-3.5 bg-white border-t border-slate-200 shrink-0 space-y-2.5">
+                <div class="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                    <span class="text-slate-600 font-medium">Total do documento final:</span>
+                    <span id="sidebar-total-summary" class="font-bold text-slate-900">1 página (1 a 1)</span>
+                </div>
+
+                <button type="button" id="btn-download-pdf" class="w-full py-3 px-4 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-sm font-bold rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <span>Baixar PDF Numerado</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- =========================================================
+             ÁREA PRINCIPAL DIREITA: PRÉ-VISUALIZAÇÃO EM TEMPO REAL
+             ========================================================= -->
+        <section class="flex-1 flex flex-col preview-grid-bg min-h-[540px] lg:h-[calc(100vh-61px)]">
+            
+            <!-- Barra Superior de Navegação e Zoom -->
+            <div class="bg-white/95 backdrop-blur-xs border-b border-slate-200 px-4 py-2 flex flex-wrap items-center justify-between gap-2 shadow-2xs z-20 shrink-0">
+                
+                <!-- Navegação de Páginas -->
+                <div class="flex items-center gap-1.5">
+                    <button type="button" id="btn-prev-page" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none text-xs font-semibold text-slate-700 flex items-center gap-1 cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                        Anterior
+                    </button>
+
+                    <div class="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1">
+                        <span class="text-xs font-semibold text-slate-700">Página <strong id="nav-current-num" class="text-brand-700">1</strong> de <strong id="nav-total-num">1</strong></span>
+                        <span id="nav-page-role-badge" class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-brand-100 text-brand-800">Capa</span>
+                    </div>
+
+                    <button type="button" id="btn-next-page" class="px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none text-xs font-semibold text-slate-700 flex items-center gap-1 cursor-pointer">
+                        Próxima
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+
+                <!-- Seletor Direto + Controles de Zoom -->
+                <div class="flex items-center gap-2">
+                    <select id="page-jump-select" class="hidden sm:block rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 max-w-[210px] focus:border-brand-500 focus:outline-none">
+                        <option value="0">Pág. 1 - Capa</option>
+                    </select>
+
+                    <div class="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
+                        <button type="button" id="btn-zoom-out" class="p-1.5 hover:bg-white rounded-md text-slate-700 cursor-pointer" title="Diminuir Zoom">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/></svg>
+                        </button>
+                        <span id="zoom-level-text" class="px-2 text-xs font-mono font-semibold text-slate-700">100%</span>
+                        <button type="button" id="btn-zoom-in" class="p-1.5 hover:bg-white rounded-md text-slate-700 cursor-pointer" title="Aumentar Zoom">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Viewport da Folha A4 -->
+            <div id="preview-viewport" class="flex-1 overflow-auto p-4 sm:p-8 flex items-start justify-center relative">
+                
+                <!-- Loader discreto -->
+                <div id="preview-spinner" class="hidden absolute inset-0 bg-slate-900/10 backdrop-blur-[1px] z-30 flex items-center justify-center">
+                    <div class="bg-white px-4 py-2.5 rounded-xl shadow-md border border-slate-200 flex items-center gap-2.5 text-xs font-semibold text-slate-700">
+                        <span class="w-4 h-4 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"></span>
+                        Renderizando página...
+                    </div>
+                </div>
+
+                <!-- Folha A4 Centralizada -->
+                <div id="a4-sheet-wrapper" class="relative bg-white shadow-xl border border-slate-300 overflow-hidden transition-all shrink-0" style="width: 595px; height: 842px;">
+                    
+                    <!-- Canvas para renderizar PDF ou desenho da Capa/Alertas -->
+                    <canvas id="preview-canvas" class="block w-full h-full"></canvas>
+
+                    <!-- Etiqueta Sobreposta da Numeração em Tempo Real -->
+                    <div id="preview-number-badge" class="absolute pointer-events-none select-none whitespace-nowrap leading-none">
+                        Página 1 de 1
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // =========================================================
+                // 1. CONFIGURAÇÃO SEGURA DO PDF.JS (SEM TRAVAR POR WORKER)
+                // =========================================================
+                let pdfjsForceNoWorker = false;
+                if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+                    try {
+                        // Configura worker da mesma versão; se falhar em iframe/CSP, caímos automaticamente para disableWorker: true
+                        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+                    } catch (e) {
+                        pdfjsForceNoWorker = true;
+                    }
+                }
+
+                // =========================================================
+                // 2. ESTADO DA APLICAÇÃO
+                // =========================================================
+                const state = {
+                    // PDF Principal
+                    pdfBytes: null,
+                    pdfDoc: null,
+                    pdfPagesCount: 0,
+                    pdfFileName: '',
+
+                    // Navegação e Zoom
+                    currentIndex: 0,
+                    zoom: 1.0,
+
+                    // Aba 1: Capa (Sempre Página 1)
+                    adminLogoDataUrl: null,
+                    adminLogoBytes: null,
+                    adminLogoType: null,
+                    adminLogoImgObj: null,
+
+                    condoImgDataUrl: null,
+                    condoImgBytes: null,
+                    condoImgType: null,
+                    condoImgObj: null,
+
+                    coverTitle: 'PRESTAÇÃO DE CONTAS',
+                    coverCondoName: 'Condomínio Residencial Jardins',
+                    coverRefText: 'Novembro / 2026',
+                    coverThemeColor: '#1e3a8a',
+                    coverTitleSize: 24,
+                    coverAlign: 'center',
+                    coverStyle: 'modern',
+
+                    // Aba 2: Alertas (Página 2 se ativo)
+                    alertsEnabled: true,
+                    alertsTitle: 'ALERTAS E OBSERVAÇÕES IMPORTANTES',
+                    alertsText: document.getElementById('alerts-text').value,
+                    alertsFontSize: 12,
+                    alertsAccentColor: '#b45309',
+
+                    // Aba 3: Numeração (Inicia em 1 na Capa)
+                    showNumOnCover: true,
+                    position: 'bottom-right',
+                    format: 'Página {n} de {total}',
+                    customFormat: 'Fl. {n} de {total}',
+                    fontFamily: 'Helvetica',
+                    fontSize: 11,
+                    textColor: '#1e293b',
+                    marginX: 36,
+                    marginY: 24,
+                    bgEnabled: true,
+                    bgColor: '#ffffff',
+                    bgOpacity: 90
+                };
+
+                // =========================================================
+                // 3. REFERÊNCIAS DO DOM
+                // =========================================================
+                const el = {
+                    pdfInput: document.getElementById('pdf-file-input'),
+                    pdfDropzone: document.getElementById('pdf-dropzone'),
+                    pdfLoadedBox: document.getElementById('pdf-loaded-box'),
+                    pdfStatusPill: document.getElementById('pdf-status-pill'),
+                    pdfFilenameText: document.getElementById('pdf-filename-text'),
+                    pdfPagecountText: document.getElementById('pdf-pagecount-text'),
+                    btnChangePdf: document.getElementById('btn-change-pdf'),
+                    btnRemovePdf: document.getElementById('btn-remove-pdf'),
+
+                    tabBtns: document.querySelectorAll('.tab-btn'),
+                    tabPanels: document.querySelectorAll('.tab-panel'),
+
+                    // Capa
+                    inputAdminLogo: document.getElementById('input-admin-logo'),
+                    adminLogoEmpty: document.getElementById('admin-logo-empty'),
+                    adminLogoFilled: document.getElementById('admin-logo-filled'),
+                    adminLogoPreviewImg: document.getElementById('admin-logo-preview-img'),
+                    btnChangeAdminLogo: document.getElementById('btn-change-admin-logo'),
+                    btnRemoveAdminLogo: document.getElementById('btn-remove-admin-logo'),
+
+                    inputCondoImg: document.getElementById('input-condo-img'),
+                    condoImgEmpty: document.getElementById('condo-img-empty'),
+                    condoImgFilled: document.getElementById('condo-img-filled'),
+                    condoImgPreviewImg: document.getElementById('condo-img-preview-img'),
+                    btnChangeCondoImg: document.getElementById('btn-change-condo-img'),
+                    btnRemoveCondoImg: document.getElementById('btn-remove-condo-img'),
+
+                    coverTitle: document.getElementById('cover-title'),
+                    coverCondoName: document.getElementById('cover-condo-name'),
+                    coverMonthSelect: document.getElementById('cover-month-select'),
+                    coverRefText: document.getElementById('cover-ref-text'),
+                    coverThemeColor: document.getElementById('cover-theme-color'),
+                    coverThemeHex: document.getElementById('cover-theme-hex'),
+                    coverTitleSize: document.getElementById('cover-title-size'),
+                    coverAlignBtns: document.querySelectorAll('.cover-align-btn'),
+                    coverStyle: document.getElementById('cover-style'),
+
+                    // Alertas
+                    alertsEnabled: document.getElementById('alerts-enabled'),
+                    alertsFormGroup: document.getElementById('alerts-form-group'),
+                    alertsTitle: document.getElementById('alerts-title'),
+                    alertsText: document.getElementById('alerts-text'),
+                    btnAddBullet: document.getElementById('btn-add-bullet'),
+                    alertsFontSize: document.getElementById('alerts-font-size'),
+                    alertsAccentColor: document.getElementById('alerts-accent-color'),
+                    alertsAccentHex: document.getElementById('alerts-accent-hex'),
+
+                    // Números
+                    showNumOnCover: document.getElementById('show-num-on-cover'),
+                    posBtns: document.querySelectorAll('.pos-btn'),
+                    numFormatSelect: document.getElementById('num-format-select'),
+                    customFormatBox: document.getElementById('custom-format-box'),
+                    numCustomFormat: document.getElementById('num-custom-format'),
+                    numFontFamily: document.getElementById('num-font-family'),
+                    numFontSize: document.getElementById('num-font-size'),
+                    numTextColor: document.getElementById('num-text-color'),
+                    numTextHex: document.getElementById('num-text-hex'),
+                    numMarginX: document.getElementById('num-margin-x'),
+                    numMarginY: document.getElementById('num-margin-y'),
+                    numBgEnabled: document.getElementById('num-bg-enabled'),
+                    numBgControls: document.getElementById('num-bg-controls'),
+                    numBgColor: document.getElementById('num-bg-color'),
+                    numBgHex: document.getElementById('num-bg-hex'),
+                    numBgOpacity: document.getElementById('num-bg-opacity'),
+                    numBgOpacityLabel: document.getElementById('num-bg-opacity-label'),
+
+                    // Rodapé e Preview
+                    sidebarTotalSummary: document.getElementById('sidebar-total-summary'),
+                    btnDownloadPdf: document.getElementById('btn-download-pdf'),
+                    btnPrevPage: document.getElementById('btn-prev-page'),
+                    btnNextPage: document.getElementById('btn-next-page'),
+                    navCurrentNum: document.getElementById('nav-current-num'),
+                    navTotalNum: document.getElementById('nav-total-num'),
+                    navPageRoleBadge: document.getElementById('nav-page-role-badge'),
+                    pageJumpSelect: document.getElementById('page-jump-select'),
+                    btnZoomOut: document.getElementById('btn-zoom-out'),
+                    btnZoomIn: document.getElementById('btn-zoom-in'),
+                    zoomLevelText: document.getElementById('zoom-level-text'),
+                    previewSpinner: document.getElementById('preview-spinner'),
+                    a4SheetWrapper: document.getElementById('a4-sheet-wrapper'),
+                    previewCanvas: document.getElementById('preview-canvas'),
+                    previewNumberBadge: document.getElementById('preview-number-badge'),
+                    toastContainer: document.getElementById('toast-container')
+                };
+
+                // =========================================================
+                // 4. UTILITÁRIOS
+                // =========================================================
+                function showToast(msg, type = 'info') {
+                    const colors = {
+                        info: 'bg-slate-800 text-white border-slate-700',
+                        success: 'bg-emerald-600 text-white border-emerald-500',
+                        error: 'bg-red-600 text-white border-red-500'
+                    };
+                    const toast = document.createElement('div');
+                    toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 transition-all ${colors[type] || colors.info}`;
+                    toast.textContent = msg;
+                    el.toastContainer.appendChild(toast);
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        setTimeout(() => toast.remove(), 250);
+                    }, 3400);
+                }
+
+                function hexToRgb(hex) {
+                    const clean = (hex || '#000000').replace('#', '');
+                    const bigint = parseInt(clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean, 16);
+                    return {
+                        r: (bigint >> 16) & 255,
+                        g: (bigint >> 8) & 255,
+                        b: bigint & 255
+                    };
+                }
+
+                function getPagesList() {
+                    const pages = [];
+                    let num = 1;
+
+                    // Página 1: Capa
+                    pages.push({
+                        type: 'cover',
+                        number: num,
+                        role: 'Capa',
+                        label: `Pág. ${num} — Capa`
+                    });
+                    num++;
+
+                    // Página 2 (Opcional): Alertas
+                    if (state.alertsEnabled) {
+                        pages.push({
+                            type: 'alerts',
+                            number: num,
+                            role: 'Alertas',
+                            label: `Pág. ${num} — Alertas / Obs.`
+                        });
+                        num++;
+                    }
+
+                    // Páginas do PDF anexado
+                    for (let i = 1; i <= state.pdfPagesCount; i++) {
+                        pages.push({
+                            type: 'pdf',
+                            pdfPageIndex: i,
+                            number: num,
+                            role: `PDF (${i}/${state.pdfPagesCount})`,
+                            label: `Pág. ${num} — PDF Anexo (Pág. ${i})`
+                        });
+                        num++;
+                    }
+
+                    return pages;
+                }
+
+                function formatPageNumber(n, total) {
+                    const tpl = state.format === 'custom' ? (state.customFormat || '{n}') : state.format;
+                    return tpl.replace(/\{n\}/gi, String(n)).replace(/\{total\}/gi, String(total));
+                }
+
+                // =========================================================
+                // 5. NAVEGAÇÃO POR ABAS
+                // =========================================================
+                el.tabBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const target = btn.dataset.tab;
+                        el.tabBtns.forEach(b => {
+                            const active = b.dataset.tab === target;
+                            b.classList.toggle('border-brand-600', active);
+                            b.classList.toggle('text-brand-700', active);
+                            b.classList.toggle('bg-white', active);
+                            b.classList.toggle('border-transparent', !active);
+                            b.classList.toggle('text-slate-600', !active);
+                        });
+                        el.tabPanels.forEach(panel => {
+                            panel.classList.toggle('hidden', panel.id !== `tab-${target}`);
+                        });
+                    });
+                });
+
+                // =========================================================
+                // 6. UPLOAD DO PDF PRINCIPAL (COM FALLBACK DE WORKER)
+                // =========================================================
+                el.pdfDropzone.addEventListener('click', () => el.pdfInput.click());
+                el.btnChangePdf.addEventListener('click', () => el.pdfInput.click());
+
+                el.pdfDropzone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    el.pdfDropzone.classList.add('border-brand-600', 'bg-brand-50');
+                });
+                el.pdfDropzone.addEventListener('dragleave', () => {
+                    el.pdfDropzone.classList.remove('border-brand-600', 'bg-brand-50');
+                });
+                el.pdfDropzone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    el.pdfDropzone.classList.remove('border-brand-600', 'bg-brand-50');
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        loadUploadedPdf(e.dataTransfer.files[0]);
+                    }
+                });
+
+                el.pdfInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        loadUploadedPdf(e.target.files[0]);
+                    }
+                    e.target.value = '';
+                });
+
+                el.btnRemovePdf.addEventListener('click', () => {
+                    state.pdfBytes = null;
+                    state.pdfDoc = null;
+                    state.pdfPagesCount = 0;
+                    state.pdfFileName = '';
+                    el.pdfDropzone.classList.remove('hidden');
+                    el.pdfLoadedBox.classList.add('hidden');
+                    el.pdfStatusPill.textContent = 'Nenhum PDF anexado';
+                    el.pdfStatusPill.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800';
+                    state.currentIndex = 0;
+                    refreshAll();
+                    showToast('PDF removido.', 'info');
+                });
+
+                async function openPdfWithFallback(uint8Data) {
+                    if (!window.pdfjsLib) {
+                        throw new Error('Biblioteca PDF.js ainda não carregou.');
+                    }
+                    if (!pdfjsForceNoWorker) {
+                        try {
+                            const task = window.pdfjsLib.getDocument({ data: uint8Data.slice() });
+                            return await task.promise;
+                        } catch (workerErr) {
+                            console.warn('Worker do PDF.js indisponível, alternando para modo autônomo (disableWorker):', workerErr);
+                            pdfjsForceNoWorker = true;
+                        }
+                    }
+                    const fallbackTask = window.pdfjsLib.getDocument({
+                        data: uint8Data.slice(),
+                        disableWorker: true
+                    });
+                    return await fallbackTask.promise;
+                }
+
+                async function loadUploadedPdf(file) {
+                    if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+                        showToast('Selecione um arquivo válido no formato PDF.', 'error');
+                        return;
+                    }
+
+                    try {
+                        el.previewSpinner.classList.remove('hidden');
+                        const buffer = await file.arrayBuffer();
+                        const bytes = new Uint8Array(buffer);
+                        const doc = await openPdfWithFallback(bytes);
+
+                        state.pdfBytes = bytes;
+                        state.pdfDoc = doc;
+                        state.pdfPagesCount = doc.numPages;
+                        state.pdfFileName = file.name.replace(/\.pdf$/i, '');
+
+                        el.pdfDropzone.classList.add('hidden');
+                        el.pdfLoadedBox.classList.remove('hidden');
+                        el.pdfFilenameText.textContent = file.name;
+                        el.pdfPagecountText.textContent = `${doc.numPages} página(s) anexadas`;
+                        el.pdfStatusPill.textContent = `${doc.numPages} pág. anexadas`;
+                        el.pdfStatusPill.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+
+                        // Vai para a primeira página do PDF anexado para conferência
+                        state.currentIndex = state.alertsEnabled ? 2 : 1;
+                        await refreshAll();
+                        showToast(`PDF carregado (${doc.numPages} páginas).`, 'success');
+                    } catch (err) {
+                        console.error(err);
+                        showToast('Não foi possível ler o PDF. Verifique se não está protegido por senha.', 'error');
+                    } finally {
+                        el.previewSpinner.classList.add('hidden');
+                    }
+                }
+
+                // =========================================================
+                // 7. UPLOAD DAS IMAGENS DA CAPA
+                // =========================================================
+                function setupImageUploader(opts) {
+                    // Garante que a área inteira e o botão Trocar abram o seletor.
+                    opts.emptyBox.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        opts.input.click();
+                    });
+
+                    opts.changeBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        opts.input.click();
+                    });
+
+                    opts.removeBtn.addEventListener('click', () => {
+                        opts.onClear();
+                        opts.previewImg.removeAttribute('src');
+                        opts.emptyBox.classList.remove('hidden');
+                        opts.filledBox.classList.add('hidden');
+                        opts.input.value = '';
+                        refreshAll();
+                        showToast('Imagem removida.', 'info');
+                    });
+
+                    opts.input.addEventListener('change', async (e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (!file) return;
+
+                        try {
+                            if (!file.type.startsWith('image/')) {
+                                throw new Error('Selecione um arquivo de imagem válido.');
+                            }
+
+                            // Lê a imagem e aguarda a decodificação antes de atualizar a capa.
+                            const dataUrl = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => resolve(reader.result);
+                                reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+                                reader.readAsDataURL(file);
+                            });
+
+                            const imgObj = await new Promise((resolve, reject) => {
+                                const img = new Image();
+                                img.onload = () => resolve(img);
+                                img.onerror = () => reject(new Error('Formato de imagem não suportado pelo navegador. Use JPG ou PNG.'));
+                                img.src = dataUrl;
+                            });
+
+                            if (!imgObj.naturalWidth || !imgObj.naturalHeight) {
+                                throw new Error('A imagem está vazia ou não pôde ser decodificada.');
+                            }
+
+                            // Padroniza qualquer imagem decodificável para PNG.
+                            // Isso evita incompatibilidade de MIME/WebP/JPG na geração do PDF.
+                            const canvas = document.createElement('canvas');
+                            canvas.width = imgObj.naturalWidth;
+                            canvas.height = imgObj.naturalHeight;
+                            const ctx = canvas.getContext('2d');
+                            if (!ctx) throw new Error('Não foi possível processar a imagem.');
+
+                            ctx.drawImage(imgObj, 0, 0);
+                            const pngBlob = await new Promise((resolve, reject) => {
+                                canvas.toBlob(blob => {
+                                    if (blob) resolve(blob);
+                                    else reject(new Error('Falha ao converter a imagem para PNG.'));
+                                }, 'image/png');
+                            });
+
+                            const bytes = new Uint8Array(await pngBlob.arrayBuffer());
+                            const normalizedDataUrl = canvas.toDataURL('image/png');
+
+                            opts.onLoad({
+                                dataUrl: normalizedDataUrl,
+                                bytes,
+                                type: 'image/png',
+                                imgObj
+                            });
+
+                            opts.previewImg.src = normalizedDataUrl;
+                            opts.emptyBox.classList.add('hidden');
+                            opts.filledBox.classList.remove('hidden');
+                            state.currentIndex = 0;
+                            await refreshAll();
+                            showToast('Imagem do condomínio/administradora carregada com sucesso.', 'success');
+                        } catch (err) {
+                            console.error('Falha no upload da imagem:', err);
+                            showToast(err.message || 'Erro ao carregar imagem. Tente JPG ou PNG.', 'error');
+                        } finally {
+                            // Permite selecionar novamente o mesmo arquivo.
+                            opts.input.value = '';
+                        }
+                    });
+                }
+
+                setupImageUploader({
+                    input: el.inputAdminLogo,
+                    emptyBox: el.adminLogoEmpty,
+                    filledBox: el.adminLogoFilled,
+                    previewImg: el.adminLogoPreviewImg,
+                    changeBtn: el.btnChangeAdminLogo,
+                    removeBtn: el.btnRemoveAdminLogo,
+                    onLoad: ({ dataUrl, bytes, type, imgObj }) => {
+                        state.adminLogoDataUrl = dataUrl;
+                        state.adminLogoBytes = bytes;
+                        state.adminLogoType = type;
+                        state.adminLogoImgObj = imgObj;
+                    },
+                    onClear: () => {
+                        state.adminLogoDataUrl = null;
+                        state.adminLogoBytes = null;
+                        state.adminLogoType = null;
+                        state.adminLogoImgObj = null;
+                    }
+                });
+
+                setupImageUploader({
+                    input: el.inputCondoImg,
+                    emptyBox: el.condoImgEmpty,
+                    filledBox: el.condoImgFilled,
+                    previewImg: el.condoImgPreviewImg,
+                    changeBtn: el.btnChangeCondoImg,
+                    removeBtn: el.btnRemoveCondoImg,
+                    onLoad: ({ dataUrl, bytes, type, imgObj }) => {
+                        state.condoImgDataUrl = dataUrl;
+                        state.condoImgBytes = bytes;
+                        state.condoImgType = type;
+                        state.condoImgObj = imgObj;
+                    },
+                    onClear: () => {
+                        state.condoImgDataUrl = null;
+                        state.condoImgBytes = null;
+                        state.condoImgType = null;
+                        state.condoImgObj = null;
+                    }
+                });
+
+                // =========================================================
+                // 8. LISTENERS DE CONFIGURAÇÕES (CAPA, ALERTAS, NÚMEROS)
+                // =========================================================
+                el.coverTitle.addEventListener('input', (e) => { state.coverTitle = e.target.value; refreshAll(); });
+                el.coverCondoName.addEventListener('input', (e) => { state.coverCondoName = e.target.value; refreshAll(); });
+                el.coverRefText.addEventListener('input', (e) => { state.coverRefText = e.target.value; refreshAll(); });
+                el.coverMonthSelect.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        const yearMatch = state.coverRefText.match(/\d{4}/);
+                        const year = yearMatch ? yearMatch[0] : new Date().getFullYear();
+                        state.coverRefText = `${e.target.value} / ${year}`;
+                        el.coverRefText.value = state.coverRefText;
+                        refreshAll();
+                    }
+                });
+                el.coverThemeColor.addEventListener('input', (e) => {
+                    state.coverThemeColor = e.target.value;
+                    el.coverThemeHex.textContent = e.target.value.toUpperCase();
+                    refreshAll();
+                });
+                el.coverTitleSize.addEventListener('input', (e) => {
+                    state.coverTitleSize = Math.max(12, Math.min(48, Number(e.target.value) || 24));
+                    refreshAll();
+                });
+                el.coverAlignBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state.coverAlign = btn.dataset.align;
+                        el.coverAlignBtns.forEach(b => {
+                            const active = b.dataset.align === state.coverAlign;
+                            b.classList.toggle('bg-white', active);
+                            b.classList.toggle('text-brand-700', active);
+                            b.classList.toggle('shadow-2xs', active);
+                            b.classList.toggle('text-slate-600', !active);
+                        });
+                        refreshAll();
+                    });
+                });
+                el.coverStyle.addEventListener('change', (e) => { state.coverStyle = e.target.value; refreshAll(); });
+
+                // Alertas
+                el.alertsEnabled.addEventListener('change', (e) => {
+                    state.alertsEnabled = e.target.checked;
+                    el.alertsFormGroup.classList.toggle('opacity-50', !state.alertsEnabled);
+                    el.alertsFormGroup.classList.toggle('pointer-events-none', !state.alertsEnabled);
+                    if (state.alertsEnabled) state.currentIndex = 1;
+                    refreshAll();
+                });
+                el.alertsTitle.addEventListener('input', (e) => { state.alertsTitle = e.target.value; refreshAll(); });
+                el.alertsText.addEventListener('input', (e) => { state.alertsText = e.target.value; refreshAll(); });
+                el.btnAddBullet.addEventListener('click', () => {
+                    const ta = el.alertsText;
+                    const prefix = ta.value && !ta.value.endsWith('\n') ? '\n• ' : '• ';
+                    ta.value += prefix;
+                    state.alertsText = ta.value;
+                    ta.focus();
+                    refreshAll();
+                });
+                el.alertsFontSize.addEventListener('input', (e) => {
+                    state.alertsFontSize = Math.max(8, Math.min(24, Number(e.target.value) || 12));
+                    refreshAll();
+                });
+                el.alertsAccentColor.addEventListener('input', (e) => {
+                    state.alertsAccentColor = e.target.value;
+                    el.alertsAccentHex.textContent = e.target.value.toUpperCase();
+                    refreshAll();
+                });
+
+                // Números
+                el.showNumOnCover.addEventListener('change', (e) => {
+                    state.showNumOnCover = e.target.checked;
+                    refreshAll();
+                });
+                el.posBtns.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        state.position = btn.dataset.pos;
+                        el.posBtns.forEach(b => {
+                            const active = b.dataset.pos === state.position;
+                            b.classList.toggle('bg-brand-600', active);
+                            b.classList.toggle('text-white', active);
+                            b.classList.toggle('font-semibold', active);
+                            b.classList.toggle('shadow-2xs', active);
+                            b.classList.toggle('bg-white', !active);
+                            b.classList.toggle('text-slate-600', !active);
+                        });
+                        refreshAll();
+                    });
+                });
+                el.numFormatSelect.addEventListener('change', (e) => {
+                    state.format = e.target.value;
+                    el.customFormatBox.classList.toggle('hidden', state.format !== 'custom');
+                    refreshAll();
+                });
+                el.numCustomFormat.addEventListener('input', (e) => { state.customFormat = e.target.value; refreshAll(); });
+                el.numFontFamily.addEventListener('change', (e) => { state.fontFamily = e.target.value; refreshAll(); });
+                el.numFontSize.addEventListener('input', (e) => {
+                    state.fontSize = Math.max(6, Math.min(48, Number(e.target.value) || 11));
+                    refreshAll();
+                });
+                el.numTextColor.addEventListener('input', (e) => {
+                    state.textColor = e.target.value;
+                    el.numTextHex.textContent = e.target.value.toUpperCase();
+                    refreshAll();
+                });
+                el.numMarginX.addEventListener('input', (e) => { state.marginX = Math.max(0, Number(e.target.value) || 0); refreshAll(); });
+                el.numMarginY.addEventListener('input', (e) => { state.marginY = Math.max(0, Number(e.target.value) || 0); refreshAll(); });
+                el.numBgEnabled.addEventListener('change', (e) => {
+                    state.bgEnabled = e.target.checked;
+                    el.numBgControls.classList.toggle('opacity-40', !state.bgEnabled);
+                    el.numBgControls.classList.toggle('pointer-events-none', !state.bgEnabled);
+                    refreshAll();
+                });
+                el.numBgColor.addEventListener('input', (e) => {
+                    state.bgColor = e.target.value;
+                    el.numBgHex.textContent = e.target.value.toUpperCase();
+                    refreshAll();
+                });
+                el.numBgOpacity.addEventListener('input', (e) => {
+                    state.bgOpacity = Number(e.target.value);
+                    el.numBgOpacityLabel.textContent = state.bgOpacity;
+                    refreshAll();
+                });
+
+                // Navegação Preview e Zoom
+                el.btnPrevPage.addEventListener('click', () => {
+                    if (state.currentIndex > 0) {
+                        state.currentIndex--;
+                        refreshAll();
+                    }
+                });
+                el.btnNextPage.addEventListener('click', () => {
+                    const total = getPagesList().length;
+                    if (state.currentIndex < total - 1) {
+                        state.currentIndex++;
+                        refreshAll();
+                    }
+                });
+                el.pageJumpSelect.addEventListener('change', (e) => {
+                    state.currentIndex = Number(e.target.value) || 0;
+                    refreshAll();
+                });
+                el.btnZoomOut.addEventListener('click', () => {
+                    state.zoom = Math.max(0.5, +(state.zoom - 0.1).toFixed(2));
+                    refreshAll();
+                });
+                el.btnZoomIn.addEventListener('click', () => {
+                    state.zoom = Math.min(1.6, +(state.zoom + 0.1).toFixed(2));
+                    refreshAll();
+                });
+
+                // =========================================================
+                // 9. DESENHO DAS PÁGINAS NO PREVIEW (CANVAS A4)
+                // =========================================================
+                function wrapTextLines(ctx, text, maxWidth) {
+                    const paragraphs = (text || '').split('\n');
+                    const result = [];
+                    for (const para of paragraphs) {
+                        if (!para.trim()) {
+                            result.push('');
+                            continue;
+                        }
+                        const words = para.split(' ');
+                        let line = '';
+                        for (const word of words) {
+                            const testLine = line ? `${line} ${word}` : word;
+                            if (ctx.measureText(testLine).width > maxWidth && line) {
+                                result.push(line);
+                                line = word;
+                            } else {
+                                line = testLine;
+                            }
+                        }
+                        if (line) result.push(line);
+                    }
+                    return result;
+                }
+
+                function drawCoverOnCanvas(ctx, w, h) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, w, h);
+
+                    const theme = state.coverThemeColor;
+                    const isClassic = state.coverStyle === 'classic';
+                    const isLeft = state.coverAlign === 'left';
+
+                    if (isClassic) {
+                        ctx.strokeStyle = theme;
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(28, 28, w - 56, h - 56);
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(34, 34, w - 68, h - 68);
+                    } else {
+                        ctx.fillStyle = theme;
+                        ctx.fillRect(0, 0, w, 18);
+                        ctx.fillRect(0, h - 14, w, 14);
+                    }
+
+                    // Logo da Administradora no topo
+                    let cursorY = 75;
+                    if (state.adminLogoImgObj) {
+                        const img = state.adminLogoImgObj;
+                        const maxW = 190;
+                        const maxH = 85;
+                        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+                        const dw = img.naturalWidth * ratio;
+                        const dh = img.naturalHeight * ratio;
+                        const dx = isLeft ? 56 : (w - dw) / 2;
+                        ctx.drawImage(img, dx, cursorY, dw, dh);
+                        cursorY += dh + 42;
+                    } else {
+                        // Placeholder elegante
+                        const pw = 170, ph = 54;
+                        const px = isLeft ? 56 : (w - pw) / 2;
+                        ctx.save();
+                        ctx.setLineDash([4, 4]);
+                        ctx.strokeStyle = '#cbd5e1';
+                        ctx.strokeRect(px, cursorY, pw, ph);
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.font = '500 10px Inter, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('LOGO ADMINISTRADORA', px + pw / 2, cursorY + ph / 2 + 3);
+                        ctx.restore();
+                        cursorY += ph + 45;
+                    }
+
+                    // Linha divisória
+                    ctx.fillStyle = theme;
+                    const lineW = 80;
+                    const lineX = isLeft ? 56 : (w - lineW) / 2;
+                    ctx.fillRect(lineX, cursorY, lineW, 4);
+                    cursorY += 32;
+
+                    // Título Principal
+                    ctx.fillStyle = '#0f172a';
+                    ctx.font = `800 ${state.coverTitleSize}px Inter, sans-serif`;
+                    ctx.textAlign = isLeft ? 'left' : 'center';
+                    const textX = isLeft ? 56 : w / 2;
+                    const maxTextW = w - 112;
+
+                    const titleLines = wrapTextLines(ctx, state.coverTitle || 'PRESTAÇÃO DE CONTAS', maxTextW);
+                    for (const line of titleLines) {
+                        ctx.fillText(line, textX, cursorY);
+                        cursorY += state.coverTitleSize * 1.25;
+                    }
+                    cursorY += 10;
+
+                    // Nome do Condomínio
+                    ctx.fillStyle = theme;
+                    ctx.font = '600 16px Inter, sans-serif';
+                    const condoLines = wrapTextLines(ctx, state.coverCondoName || '', maxTextW);
+                    for (const line of condoLines) {
+                        ctx.fillText(line, textX, cursorY);
+                        cursorY += 22;
+                    }
+                    cursorY += 24;
+
+                    // Foto / Logo do Condomínio
+                    if (state.condoImgObj) {
+                        const img = state.condoImgObj;
+                        const maxW = 280;
+                        const maxH = 190;
+                        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight, 1);
+                        const dw = img.naturalWidth * ratio;
+                        const dh = img.naturalHeight * ratio;
+                        const dx = isLeft ? 56 : (w - dw) / 2;
+                        ctx.drawImage(img, dx, cursorY, dw, dh);
+                        cursorY += dh + 32;
+                    } else {
+                        const pw = 230, ph = 135;
+                        const px = isLeft ? 56 : (w - pw) / 2;
+                        ctx.save();
+                        ctx.setLineDash([4, 4]);
+                        ctx.strokeStyle = '#cbd5e1';
+                        ctx.strokeRect(px, cursorY, pw, ph);
+                        ctx.fillStyle = '#94a3b8';
+                        ctx.font = '500 11px Inter, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('IMAGEM DO CONDOMÍNIO', px + pw / 2, cursorY + ph / 2 + 4);
+                        ctx.restore();
+                        cursorY += ph + 36;
+                    }
+
+                    // Caixa Mês de Referência
+                    const refLabel = (state.coverRefText || '').trim();
+                    if (refLabel) {
+                        const boxY = Math.min(h - 135, Math.max(cursorY + 10, h - 165));
+                        ctx.font = '700 14px Inter, sans-serif';
+                        const badgeText = `REFERÊNCIA: ${refLabel.toUpperCase()}`;
+                        const tw = ctx.measureText(badgeText).width;
+                        const boxW = Math.min(w - 112, tw + 44);
+                        const boxH = 40;
+                        const boxX = isLeft ? 56 : (w - boxW) / 2;
+
+                        const rgb = hexToRgb(theme);
+                        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`;
+                        ctx.fillRect(boxX, boxY, boxW, boxH);
+                        ctx.strokeStyle = theme;
+                        ctx.lineWidth = 1.5;
+                        ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+                        ctx.fillStyle = theme;
+                        ctx.textAlign = 'center';
+                        ctx.fillText(badgeText, boxX + boxW / 2, boxY + 25);
+                    }
+                }
+
+                function drawAlertsOnCanvas(ctx, w, h) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, w, h);
+
+                    const accent = state.alertsAccentColor;
+                    const rgb = hexToRgb(accent);
+
+                    // Faixa superior de aviso
+                    ctx.fillStyle = accent;
+                    ctx.fillRect(0, 0, w, 12);
+
+                    // Cabeçalho da página de alertas
+                    ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`;
+                    ctx.fillRect(48, 54, w - 96, 54);
+                    ctx.fillStyle = accent;
+                    ctx.fillRect(48, 54, 5, 54);
+
+                    ctx.fillStyle = accent;
+                    ctx.font = '700 16px Inter, sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(state.alertsTitle || 'ALERTAS E OBSERVAÇÕES', 66, 86);
+
+                    // Corpo do texto
+                    ctx.fillStyle = '#1e293b';
+                    const fSize = state.alertsFontSize;
+                    ctx.font = `400 ${fSize}px Inter, sans-serif`;
+                    const lines = wrapTextLines(ctx, state.alertsText, w - 104);
+
+                    let y = 142;
+                    const lineHeight = fSize * 1.55;
+                    for (const line of lines) {
+                        if (y > h - 75) break;
+                        ctx.fillText(line, 52, y);
+                        y += lineHeight;
+                    }
+                }
+
+                function positionNumberOverlay(descriptor, totalPages) {
+                    const badge = el.previewNumberBadge;
+                    const isCover = descriptor.type === 'cover';
+
+                    if (isCover && !state.showNumOnCover) {
+                        badge.classList.add('hidden');
+                        return;
+                    }
+
+                    badge.classList.remove('hidden');
+                    badge.textContent = formatPageNumber(descriptor.number, totalPages);
+
+                    const z = state.zoom;
+                    const fSize = state.fontSize * z;
+                    const mx = state.marginX * z;
+                    const my = state.marginY * z;
+
+                    let cssFont = 'Inter, Helvetica, Arial, sans-serif';
+                    if (state.fontFamily === 'TimesRoman') cssFont = '"Times New Roman", Georgia, serif';
+                    if (state.fontFamily === 'Courier') cssFont = '"Courier New", monospace';
+
+                    badge.style.fontFamily = cssFont;
+                    badge.style.fontSize = `${fSize}px`;
+                    badge.style.fontWeight = '600';
+                    badge.style.color = state.textColor;
+
+                    if (state.bgEnabled) {
+                        const rgb = hexToRgb(state.bgColor);
+                        badge.style.backgroundColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${state.bgOpacity / 100})`;
+                        badge.style.padding = `${4 * z}px ${8 * z}px`;
+                        badge.style.borderRadius = `${4 * z}px`;
+                        badge.style.boxShadow = '0 1px 2px rgba(0,0,0,0.08)';
+                    } else {
+                        badge.style.backgroundColor = 'transparent';
+                        badge.style.padding = '0px';
+                        badge.style.boxShadow = 'none';
+                    }
+
+                    // Reset posições
+                    badge.style.top = 'auto';
+                    badge.style.bottom = 'auto';
+                    badge.style.left = 'auto';
+                    badge.style.right = 'auto';
+                    badge.style.transform = 'none';
+
+                    const [vPos, hPos] = state.position.split('-');
+                    if (vPos === 'top') badge.style.top = `${my}px`;
+                    else badge.style.bottom = `${my}px`;
+
+                    if (hPos === 'left') {
+                        badge.style.left = `${mx}px`;
+                    } else if (hPos === 'center') {
+                        badge.style.left = '50%';
+                        badge.style.transform = 'translateX(-50%)';
+                    } else {
+                        badge.style.right = `${mx}px`;
+                    }
+                }
+
+                async function renderPreviewPage() {
+                    const pages = getPagesList();
+                    if (state.currentIndex >= pages.length) state.currentIndex = pages.length - 1;
+                    if (state.currentIndex < 0) state.currentIndex = 0;
+
+                    const current = pages[state.currentIndex];
+                    const total = pages.length;
+
+                    // Atualiza controles de navegação
+                    el.navCurrentNum.textContent = current.number;
+                    el.navTotalNum.textContent = total;
+                    el.navPageRoleBadge.textContent = current.role;
+                    el.btnPrevPage.disabled = state.currentIndex <= 0;
+                    el.btnNextPage.disabled = state.currentIndex >= total - 1;
+                    el.zoomLevelText.textContent = `${Math.round(state.zoom * 100)}%`;
+
+                    el.pageJumpSelect.innerHTML = pages.map((p, idx) =>
+                        `<option value="${idx}" ${idx === state.currentIndex ? 'selected' : ''}>${p.label}</option>`
+                    ).join('');
+
+                    el.sidebarTotalSummary.textContent = total === 1
+                        ? '1 página (Capa = 1)'
+                        : `${total} páginas (1 a ${total})`;
+
+                    const canvas = el.previewCanvas;
+                    const ctx = canvas.getContext('2d');
+                    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+                    if (current.type === 'cover' || current.type === 'alerts') {
+                        const baseW = 595;
+                        const baseH = 842;
+                        const viewW = Math.round(baseW * state.zoom);
+                        const viewH = Math.round(baseH * state.zoom);
+
+                        el.a4SheetWrapper.style.width = `${viewW}px`;
+                        el.a4SheetWrapper.style.height = `${viewH}px`;
+
+                        canvas.width = Math.round(baseW * state.zoom * dpr);
+                        canvas.height = Math.round(baseH * state.zoom * dpr);
+
+                        ctx.save();
+                        ctx.scale(state.zoom * dpr, state.zoom * dpr);
+                        if (current.type === 'cover') {
+                            drawCoverOnCanvas(ctx, baseW, baseH);
+                        } else {
+                            drawAlertsOnCanvas(ctx, baseW, baseH);
+                        }
+                        ctx.restore();
+                    } else if (current.type === 'pdf' && state.pdfDoc) {
+                        const pdfPage = await state.pdfDoc.getPage(current.pdfPageIndex);
+                        const unscaledViewport = pdfPage.getViewport({ scale: 1 });
+                        // Ajusta largura base próxima a 595pt mantendo proporção real da página do PDF
+                        const fitScale = (595 / unscaledViewport.width) * state.zoom;
+                        const viewport = pdfPage.getViewport({ scale: fitScale });
+                        const renderViewport = pdfPage.getViewport({ scale: fitScale * dpr });
+
+                        el.a4SheetWrapper.style.width = `${Math.round(viewport.width)}px`;
+                        el.a4SheetWrapper.style.height = `${Math.round(viewport.height)}px`;
+
+                        canvas.width = Math.round(renderViewport.width);
+                        canvas.height = Math.round(renderViewport.height);
+
+                        await pdfPage.render({
+                            canvasContext: ctx,
+                            viewport: renderViewport
+                        }).promise;
+                    }
+
+                    positionNumberOverlay(current, total);
+                }
+
+                async function refreshAll() {
+                    try {
+                        await renderPreviewPage();
+                    } catch (err) {
+                        console.error('Erro ao renderizar preview:', err);
+                    }
+                }
+
+                // =========================================================
+                // 10. GERAÇÃO VETORIAL DO PDF FINAL COM PDF-LIB
+                // =========================================================
+                function wrapPdfLibText(text, font, size, maxWidth) {
+                    const paragraphs = (text || '').split('\n');
+                    const lines = [];
+                    for (const para of paragraphs) {
+                        if (!para.trim()) {
+                            lines.push('');
+                            continue;
+                        }
+                        const words = para.split(' ');
+                        let currentLine = '';
+                        for (const word of words) {
+                            const test = currentLine ? `${currentLine} ${word}` : word;
+                            if (font.widthOfTextAtSize(test, size) > maxWidth && currentLine) {
+                                lines.push(currentLine);
+                                currentLine = word;
+                            } else {
+                                currentLine = test;
+                            }
+                        }
+                        if (currentLine) lines.push(currentLine);
+                    }
+                    return lines;
+                }
+
+                el.btnDownloadPdf.addEventListener('click', async () => {
+                    if (!window.PDFLib) {
+                        showToast('Biblioteca pdf-lib indisponível. Verifique sua conexão.', 'error');
+                        return;
+                    }
+
+                    const originalBtnHtml = el.btnDownloadPdf.innerHTML;
+                    el.btnDownloadPdf.disabled = true;
+                    el.btnDownloadPdf.innerHTML = `<span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>Gerando PDF...</span>`;
+
+                    try {
+                        const { PDFDocument, StandardFonts, rgb } = window.PDFLib;
+                        const finalPdf = await PDFDocument.create();
+
+                        const fontBold = await finalPdf.embedFont(StandardFonts.HelveticaBold);
+                        const fontRegular = await finalPdf.embedFont(StandardFonts.Helvetica);
+
+                        let numberFont = fontBold;
+                        if (state.fontFamily === 'TimesRoman') {
+                            numberFont = await finalPdf.embedFont(StandardFonts.TimesRomanBold);
+                        } else if (state.fontFamily === 'Courier') {
+                            numberFont = await finalPdf.embedFont(StandardFonts.CourierBold);
+                        }
+
+                        const A4_W = 595.28;
+                        const A4_H = 841.89;
+
+                        // -------------------------------------------------
+                        // PÁGINA 1: CAPA
+                        // -------------------------------------------------
+                        const coverPage = finalPdf.addPage([A4_W, A4_H]);
+                        const themeRgb = hexToRgb(state.coverThemeColor);
+                        const themeColorPdf = rgb(themeRgb.r / 255, themeRgb.g / 255, themeRgb.b / 255);
+                        const isClassic = state.coverStyle === 'classic';
+                        const isLeft = state.coverAlign === 'left';
+
+                        if (isClassic) {
+                            coverPage.drawRectangle({
+                                x: 28, y: 28, width: A4_W - 56, height: A4_H - 56,
+                                borderColor: themeColorPdf, borderWidth: 3
+                            });
+                            coverPage.drawRectangle({
+                                x: 34, y: 34, width: A4_W - 68, height: A4_H - 68,
+                                borderColor: themeColorPdf, borderWidth: 1
+                            });
+                        } else {
+                            coverPage.drawRectangle({ x: 0, y: A4_H - 18, width: A4_W, height: 18, color: themeColorPdf });
+                            coverPage.drawRectangle({ x: 0, y: 0, width: A4_W, height: 14, color: themeColorPdf });
+                        }
+
+                        let topCursor = 75;
+
+                        // Logo Administradora
+                        if (state.adminLogoBytes) {
+                            const embeddedAdmin = state.adminLogoType && state.adminLogoType.includes('png')
+                                ? await finalPdf.embedPng(state.adminLogoBytes)
+                                : await finalPdf.embedJpg(state.adminLogoBytes);
+                            const scale = Math.min(190 / embeddedAdmin.width, 85 / embeddedAdmin.height, 1);
+                            const dw = embeddedAdmin.width * scale;
+                            const dh = embeddedAdmin.height * scale;
+                            const dx = isLeft ? 56 : (A4_W - dw) / 2;
+                            coverPage.drawImage(embeddedAdmin, {
+                                x: dx,
+                                y: A4_H - topCursor - dh,
+                                width: dw,
+                                height: dh
+                            });
+                            topCursor += dh + 42;
+                        } else {
+                            topCursor += 60;
+                        }
+
+                        // Linha divisória
+                        const lineW = 80;
+                        const lineX = isLeft ? 56 : (A4_W - lineW) / 2;
+                        coverPage.drawRectangle({
+                            x: lineX,
+                            y: A4_H - topCursor - 4,
+                            width: lineW,
+                            height: 4,
+                            color: themeColorPdf
+                        });
+                        topCursor += 34;
+
+                        // Título Principal
+                        const maxTextW = A4_W - 112;
+                        const tSize = state.coverTitleSize;
+                        const titleLines = wrapPdfLibText(state.coverTitle || 'PRESTAÇÃO DE CONTAS', fontBold, tSize, maxTextW);
+                        for (const line of titleLines) {
+                            const lw = fontBold.widthOfTextAtSize(line, tSize);
+                            const lx = isLeft ? 56 : (A4_W - lw) / 2;
+                            coverPage.drawText(line, {
+                                x: lx,
+                                y: A4_H - topCursor,
+                                size: tSize,
+                                font: fontBold,
+                                color: rgb(0.06, 0.09, 0.16)
+                            });
+                            topCursor += tSize * 1.25;
+                        }
+                        topCursor += 10;
+
+                        // Nome do Condomínio
+                        const condoSize = 16;
+                        const condoLines = wrapPdfLibText(state.coverCondoName || '', fontBold, condoSize, maxTextW);
+                        for (const line of condoLines) {
+                            const lw = fontBold.widthOfTextAtSize(line, condoSize);
+                            const lx = isLeft ? 56 : (A4_W - lw) / 2;
+                            coverPage.drawText(line, {
+                                x: lx,
+                                y: A4_H - topCursor,
+                                size: condoSize,
+                                font: fontBold,
+                                color: themeColorPdf
+                            });
+                            topCursor += 22;
+                        }
+                        topCursor += 24;
+
+                        // Imagem Condomínio
+                        if (state.condoImgBytes) {
+                            const embeddedCondo = state.condoImgType && state.condoImgType.includes('png')
+                                ? await finalPdf.embedPng(state.condoImgBytes)
+                                : await finalPdf.embedJpg(state.condoImgBytes);
+                            const scale = Math.min(280 / embeddedCondo.width, 190 / embeddedCondo.height, 1);
+                            const dw = embeddedCondo.width * scale;
+                            const dh = embeddedCondo.height * scale;
+                            const dx = isLeft ? 56 : (A4_W - dw) / 2;
+                            coverPage.drawImage(embeddedCondo, {
+                                x: dx,
+                                y: A4_H - topCursor - dh,
+                                width: dw,
+                                height: dh
+                            });
+                            topCursor += dh + 32;
+                        }
+
+                        // Caixa Mês de Referência
+                        const refClean = (state.coverRefText || '').trim();
+                        if (refClean) {
+                            const refText = `REFERÊNCIA: ${refClean.toUpperCase()}`;
+                            const refSize = 13;
+                            const tw = fontBold.widthOfTextAtSize(refText, refSize);
+                            const boxW = Math.min(A4_W - 112, tw + 44);
+                            const boxH = 38;
+                            const boxX = isLeft ? 56 : (A4_W - boxW) / 2;
+                            const boxTop = Math.min(A4_H - 135, Math.max(topCursor + 10, A4_H - 165));
+                            const boxY = A4_H - boxTop - boxH;
+
+                            coverPage.drawRectangle({
+                                x: boxX,
+                                y: boxY,
+                                width: boxW,
+                                height: boxH,
+                                color: themeColorPdf,
+                                opacity: 0.1,
+                                borderColor: themeColorPdf,
+                                borderWidth: 1.5
+                            });
+
+                            coverPage.drawText(refText, {
+                                x: boxX + (boxW - tw) / 2,
+                                y: boxY + 13,
+                                size: refSize,
+                                font: fontBold,
+                                color: themeColorPdf
+                            });
+                        }
+
+                        // -------------------------------------------------
+                        // PÁGINA 2 (OPCIONAL): ALERTAS E OBSERVAÇÕES
+                        // -------------------------------------------------
+                        if (state.alertsEnabled) {
+                            const alertPage = finalPdf.addPage([A4_W, A4_H]);
+                            const accRgb = hexToRgb(state.alertsAccentColor);
+                            const accColor = rgb(accRgb.r / 255, accRgb.g / 255, accRgb.b / 255);
+
+                            alertPage.drawRectangle({ x: 0, y: A4_H - 12, width: A4_W, height: 12, color: accColor });
+                            alertPage.drawRectangle({
+                                x: 48, y: A4_H - 108, width: A4_W - 96, height: 54,
+                                color: accColor, opacity: 0.08
+                            });
+                            alertPage.drawRectangle({
+                                x: 48, y: A4_H - 108, width: 5, height: 54,
+                                color: accColor
+                            });
+
+                            alertPage.drawText(state.alertsTitle || 'ALERTAS E OBSERVAÇÕES', {
+                                x: 66,
+                                y: A4_H - 86,
+                                size: 15,
+                                font: fontBold,
+                                color: accColor
+                            });
+
+                            const aSize = state.alertsFontSize;
+                            const alertLines = wrapPdfLibText(state.alertsText, fontRegular, aSize, A4_W - 104);
+                            let ay = A4_H - 142;
+                            const lineStep = aSize * 1.55;
+
+                            for (const line of alertLines) {
+                                if (ay < 75) break;
+                                if (line) {
+                                    alertPage.drawText(line, {
+                                        x: 52,
+                                        y: ay,
+                                        size: aSize,
+                                        font: fontRegular,
+                                        color: rgb(0.12, 0.16, 0.23)
+                                    });
+                                }
+                                ay -= lineStep;
+                            }
+                        }
+
+                        // -------------------------------------------------
+                        // PÁGINAS SEGUINTES: COPIAR PDF ANEXADO
+                        // -------------------------------------------------
+                        if (state.pdfBytes) {
+                            const srcDoc = await PDFDocument.load(state.pdfBytes);
+                            const copiedPages = await finalPdf.copyPages(srcDoc, srcDoc.getPageIndices());
+                            copiedPages.forEach(p => finalPdf.addPage(p));
+                        }
+
+                        // -------------------------------------------------
+                        // APLICAR NUMERAÇÃO SEQUENCIAL (CAPA = 1 ATÉ N)
+                        // -------------------------------------------------
+                        const allPages = finalPdf.getPages();
+                        const totalCount = allPages.length;
+                        const [vPos, hPos] = state.position.split('-');
+
+                        const txtRgb = hexToRgb(state.textColor);
+                        const pdfTxtColor = rgb(txtRgb.r / 255, txtRgb.g / 255, txtRgb.b / 255);
+                        const bgRgb = hexToRgb(state.bgColor);
+                        const pdfBgColor = rgb(bgRgb.r / 255, bgRgb.g / 255, bgRgb.b / 255);
+                        const bgAlpha = state.bgOpacity / 100;
+
+                        allPages.forEach((page, idx) => {
+                            const pageNum = idx + 1;
+                            if (idx === 0 && !state.showNumOnCover) return;
+
+                            const label = formatPageNumber(pageNum, totalCount);
+                            const { width, height } = page.getSize();
+                            const fSize = state.fontSize;
+                            const textW = numberFont.widthOfTextAtSize(label, fSize);
+                            const textH = fSize;
+
+                            const padX = state.bgEnabled ? 8 : 0;
+                            const padY = state.bgEnabled ? 4 : 0;
+                            const boxW = textW + padX * 2;
+                            const boxH = textH + padY * 2;
+
+                            let x = state.marginX;
+                            if (hPos === 'center') x = (width - boxW) / 2;
+                            else if (hPos === 'right') x = width - state.marginX - boxW;
+
+                            let y = state.marginY;
+                            if (vPos === 'top') y = height - state.marginY - boxH;
+
+                            if (state.bgEnabled) {
+                                page.drawRectangle({
+                                    x,
+                                    y,
+                                    width: boxW,
+                                    height: boxH,
+                                    color: pdfBgColor,
+                                    opacity: bgAlpha
+                                });
+                            }
+
+                            page.drawText(label, {
+                                x: x + padX,
+                                y: y + padY + (fSize * 0.15),
+                                size: fSize,
+                                font: numberFont,
+                                color: pdfTxtColor
+                            });
+                        });
+
+                        // Download automático
+                        const outBytes = await finalPdf.save();
+                        const blob = new Blob([outBytes], { type: 'application/pdf' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        const baseName = state.pdfFileName || 'pasta_condominio';
+                        a.href = url;
+                        a.download = `${baseName}_numerado.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+                        showToast(`PDF salvo com sucesso (${totalCount} páginas numeradas)!`, 'success');
+                    } catch (err) {
+                        console.error('Erro ao gerar PDF:', err);
+                        showToast('Falha ao gerar o PDF final. Tente novamente.', 'error');
+                    } finally {
+                        el.btnDownloadPdf.disabled = false;
+                        el.btnDownloadPdf.innerHTML = originalBtnHtml;
+                    }
+                });
+
+                // Renderização inicial imediata da Capa (Página 1)
+                refreshAll();
+            } catch (fatalErr) {
+                console.error('Erro na inicialização:', fatalErr);
+            }
+        });
+    </script>
+</body>
+</html>
